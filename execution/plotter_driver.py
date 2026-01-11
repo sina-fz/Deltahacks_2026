@@ -1,9 +1,12 @@
 """
 PlotterDriver abstraction for controlling the BrachioGraph drawing arm.
-Supports both real hardware and simulation mode.
+Supports:
+- Raspberry Pi (via SSH/SCP)
+- Local hardware (if brachiograph installed locally)
+- Simulation mode
 """
 from typing import List, Tuple, Optional
-from config import SIMULATION_MODE, get_drawing_bounds
+from config import SIMULATION_MODE, USE_RASPBERRY_PI, get_drawing_bounds
 from execution.coordinate_mapper import CoordinateMapper
 from utils.logger import get_logger
 
@@ -16,27 +19,67 @@ class PlotterDriver:
     In simulation mode, prints planned movements instead of moving hardware.
     """
     
-    def __init__(self, mapper: CoordinateMapper, simulation: bool = None):
+    def __init__(self, mapper: CoordinateMapper, simulation: bool = None, use_pi: bool = None):
         """
         Initialize the plotter driver.
         
         Args:
             mapper: CoordinateMapper instance
             simulation: If True, simulate without hardware (default from config)
+            use_pi: If True, use Raspberry Pi over SSH (default from config)
         """
         self.mapper = mapper
         self.simulation = simulation if simulation is not None else SIMULATION_MODE
+        self.use_pi = use_pi if use_pi is not None else USE_RASPBERRY_PI
         self.is_initialized = False
         self._pen_is_down = False
         self.current_position: Optional[Tuple[float, float]] = None
         
-        # BrachioGraph instance (will be None in simulation)
+        # BrachioGraph instance (will be None in simulation or Pi mode)
         self.brachiograph = None
         
-        if not self.simulation:
+        # Raspberry Pi driver (will be None if not using Pi)
+        self.pi_driver = None
+        
+        if self.use_pi and not self.simulation:
+            self._initialize_pi()
+        elif not self.simulation:
             self._initialize_hardware()
         else:
             logger.info("Running in SIMULATION MODE - no hardware will be moved")
+    
+    def _initialize_pi(self) -> None:
+        """Initialize Raspberry Pi connection."""
+        try:
+            from execution.raspberry_pi import RaspberryPiDriver
+            
+            self.pi_driver = RaspberryPiDriver()
+            logger.info(f"Raspberry Pi mode enabled")
+            
+            # Test connection
+            if self.pi_driver.test_connection():
+                # Check if runjob.py is installed
+                if not self.pi_driver.check_runjob_installed():
+                    logger.warning("runjob.py not found on Pi")
+                    logger.info("Installing runjob.py on Pi...")
+                    if self.pi_driver.install_runjob():
+                        logger.info("✓ runjob.py installed successfully")
+                    else:
+                        logger.error("Failed to install runjob.py - you may need to install it manually")
+                else:
+                    logger.info("✓ runjob.py found on Pi")
+            else:
+                logger.warning("Could not connect to Pi - will fallback to simulation if needed")
+                self.simulation = True
+                
+        except ImportError as e:
+            logger.error(f"Failed to import RaspberryPiDriver: {e}")
+            logger.warning("Falling back to simulation mode")
+            self.simulation = True
+        except Exception as e:
+            logger.error(f"Failed to initialize Pi: {e}")
+            logger.warning("Falling back to simulation mode")
+            self.simulation = True
     
     def _initialize_hardware(self) -> None:
         """Initialize BrachioGraph hardware with proper bounds and configuration."""
@@ -220,7 +263,10 @@ class PlotterDriver:
     def execute_strokes(self, strokes: List[List[Tuple[float, float]]], 
                        stop_flag: callable = None) -> None:
         """
-        Execute multiple strokes using BrachioGraph's plot_lines for better accuracy.
+        Execute multiple strokes.
+        - If using Pi: Send job via SSH/SCP
+        - If local hardware: Use BrachioGraph's plot_lines
+        - If simulation: Log actions
         
         Args:
             strokes: List of polylines (each is a list of points)
@@ -236,6 +282,20 @@ class PlotterDriver:
             logger.warning("Stop flag set - aborting execution")
             return
         
+        # Raspberry Pi mode
+        if self.pi_driver and not self.simulation:
+            logger.info("Sending job to Raspberry Pi...")
+            success = self.pi_driver.send_and_execute(
+                strokes=strokes,
+                metadata={"strokes": len(strokes), "total_points": sum(len(s) for s in strokes)}
+            )
+            if success:
+                logger.info("✓ Raspberry Pi execution complete")
+            else:
+                logger.error("✗ Raspberry Pi execution failed")
+            return
+        
+        # Simulation mode
         if self.simulation:
             # In simulation, draw each stroke individually for clarity
             for i, stroke in enumerate(strokes):
@@ -244,6 +304,7 @@ class PlotterDriver:
                     return
                 logger.debug(f"Executing stroke {i+1}/{len(strokes)} ({len(stroke)} points)")
                 self.draw_polyline(stroke)
+        # Local hardware mode
         else:
             if self.brachiograph:
                 # Convert all strokes to physical coordinates (cm)

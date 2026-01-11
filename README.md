@@ -43,9 +43,10 @@ A hackathon MVP for a voice/text-driven "draw-with-me" system that controls a ph
    ```
 
 4. **Configure your API key**:
-   - For OpenAI: Set `OPENAI_API_KEY` in `.env`
-   - For Anthropic: Set `ANTHROPIC_API_KEY` in `.env`
-   - Set `LLM_PROVIDER` to `openai` or `anthropic`
+   - For OpenAI: Set `OPENAI_API_KEY` in `.env` and `LLM_PROVIDER=openai`
+   - For Anthropic: Set `ANTHROPIC_API_KEY` in `.env` and `LLM_PROVIDER=anthropic`
+   - For OpenRouter: Set `OPENROUTER_API_KEY` in `.env` and `LLM_PROVIDER=openrouter`
+     - Model format: `LLM_MODEL=openai/gpt-4o-mini` (prefix with provider name)
 
 ## Configuration
 

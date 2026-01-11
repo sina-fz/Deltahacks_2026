@@ -3,9 +3,15 @@ LangChain wrapper for LLM initialization.
 Supports OpenAI, Anthropic, and OpenRouter.
 """
 from typing import Optional
-from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_community.chat_models import ChatOpenAI as CommunityChatOpenAI
+
+# Try importing LangChain packages
+try:
+    from langchain_openai import ChatOpenAI
+    from langchain_anthropic import ChatAnthropic
+    from langchain_community.chat_models import ChatOpenAI as CommunityChatOpenAI
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
 
 from config import LLM_PROVIDER, OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, LLM_MODEL
 from utils.logger import get_logger

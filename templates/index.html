@@ -318,6 +318,18 @@
             animation: unrollScroll 0.5s ease-out;
             transform-origin: top;
         }
+        
+        /* Pulse animation for listening indicator */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+        }
     </style>
 </head>
 <body class="sketch-bg h-screen w-screen overflow-hidden text-gray-900" style="position: relative;">
@@ -380,32 +392,23 @@
                     </div>
                 </div>
 
-                <!-- Input Section -->
+                <!-- Voice Status Section -->
                 <div class="sketch-panel rounded-lg p-6 transition-all duration-300 hover:shadow-lg" style="position: relative; z-index: 1;">
-                    <h2 class="text-3xl font-bold mb-5" style="font-family: 'Playfair Display', serif; color: #1a1a1a;">Enter Instruction</h2>
+                    <h2 class="text-3xl font-bold mb-5" style="font-family: 'Playfair Display', serif; color: #1a1a1a;">Voice Assistant</h2>
                     
-                    <div class="flex gap-4 mb-5">
-                        <input 
-                            type="text" 
-                            id="instructionInput"
-                            class="sketch-input flex-1 px-5 py-4 text-lg rounded-lg transition-all duration-300 placeholder-gray-500"
-                            placeholder="e.g., 'draw a cat', 'add a flower to the left'"
-                            autocomplete="off"
-                        />
-                        <button 
-                            id="submitButton"
-                            class="sketch-button px-10 py-4 text-lg rounded-lg transition-all duration-300"
-                            style="position: relative; z-index: 1;"
-                        >
-                            Draw
-                        </button>
+                    <!-- Listening Status -->
+                    <div class="mb-5 p-4 rounded-lg border-2 border-gray-300" id="listeningStatus">
+                        <div class="flex items-center gap-3">
+                            <div class="w-3 h-3 rounded-full bg-gray-400" id="statusIndicator"></div>
+                            <span class="text-lg font-semibold text-gray-700" id="statusText">Listening for "Hey Vincent"...</span>
+                        </div>
                     </div>
                     
                     <!-- Assistant Response -->
                     <div class="sketch-panel rounded-lg p-5 border-l-4 border-gray-900 transition-all duration-300" style="position: relative; z-index: 1;">
-                        <div class="text-sm text-gray-700 uppercase tracking-wider mb-3 font-semibold" style="font-family: 'Playfair Display', serif;">Assistant Says:</div>
+                        <div class="text-sm text-gray-700 uppercase tracking-wider mb-3 font-semibold" style="font-family: 'Playfair Display', serif;">Vincent Says:</div>
                         <div id="assistantOutput" class="text-gray-900 leading-relaxed text-lg">
-                            Ready! Enter a drawing instruction above.
+                            Ready! Say "Hey Vincent" to start.
                         </div>
                     </div>
                 </div>
@@ -442,15 +445,19 @@
                     <ul class="space-y-3 text-base text-gray-700">
                         <li class="flex items-start gap-3">
                             <span class="text-gray-900 mt-1 text-xl font-bold">→</span>
-                            <span>Type what you want to draw (e.g., "draw a house")</span>
+                            <span>Say <strong>"Hey Vincent"</strong> to wake me up</span>
                         </li>
                         <li class="flex items-start gap-3">
                             <span class="text-gray-900 mt-1 text-xl font-bold">→</span>
-                            <span>Preview mode shows red strokes before drawing</span>
+                            <span>Tell me what to draw (e.g., "draw a house")</span>
                         </li>
                         <li class="flex items-start gap-3">
                             <span class="text-gray-900 mt-1 text-xl font-bold">→</span>
-                            <span>Use "Feeling Lucky" for instant drawing</span>
+                            <span>Say <strong>"Toggle preview mode"</strong> to switch modes</span>
+                        </li>
+                        <li class="flex items-start gap-3">
+                            <span class="text-gray-900 mt-1 text-xl font-bold">→</span>
+                            <span>Say <strong>"Thanks"</strong> when done (Vincent will respond)</span>
                         </li>
                     </ul>
                 </div>

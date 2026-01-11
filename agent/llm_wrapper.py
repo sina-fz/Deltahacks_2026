@@ -237,7 +237,7 @@ class LLMWrapper:
                 {"role": "user", "content": prompt}
             ],
             temperature=0.3,  # Lower temperature for more consistent, accurate responses
-            max_tokens=800,  # Reduced for faster response (prompt is now shorter)
+            max_tokens=400,  # Reduced to work with limited credits
             extra_headers={
                 "HTTP-Referer": "https://github.com/deltahacks/drawing-system",
                 "X-Title": "Drawing System"

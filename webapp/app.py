@@ -276,6 +276,8 @@ def toggle_preview_mode():
         return jsonify({"error": str(e)}), 500
 
 
+
+
 @socketio.on('connect')
 def handle_connect():
     """Handle client connection."""

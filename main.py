@@ -36,7 +36,8 @@ def main():
             logger.error(f"Failed to initialize LLM: {e}")
             print(f"\nERROR: Failed to initialize LLM: {e}")
             print("Please check your API keys in .env file or environment variables.")
-            print("Required: OPENAI_API_KEY or ANTHROPIC_API_KEY")
+            print("Required: OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY")
+            print(f"Current LLM_PROVIDER setting: {LLM_PROVIDER}")
             sys.exit(1)
         
         # Coordinate Mapper

@@ -50,6 +50,13 @@ USE_LANGCHAIN_AGENT = os.getenv("USE_LANGCHAIN_AGENT", "true").lower() == "true"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 LOG_FILE = "drawing_system.log"
 
+# Raspberry Pi Configuration
+RASPBERRY_PI_HOST = os.getenv("RASPBERRY_PI_HOST", "raspberrypi.local")  # Or use IP like "192.168.1.100"
+RASPBERRY_PI_USER = os.getenv("RASPBERRY_PI_USER", "pi")
+RASPBERRY_PI_RUNJOB_PATH = "/home/pi/runjob.py"
+RASPBERRY_PI_JOB_PATH = "/tmp/job.json"
+USE_RASPBERRY_PI = os.getenv("USE_RASPBERRY_PI", "false").lower() == "true"
+
 def get_drawing_bounds() -> Tuple[float, float, float, float]:
     """Returns (min_x, max_x, min_y, max_y)"""
     box = DRAWING_BOX
