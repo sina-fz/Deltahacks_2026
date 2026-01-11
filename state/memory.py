@@ -13,6 +13,7 @@ class Stroke:
     id: int
     points: List[Tuple[float, float]]  # Normalized coordinates [0.0, 1.0]
     label: Optional[str] = None
+    state: str = "confirmed"  # "preview" or "confirmed"
 
 
 @dataclass
@@ -27,7 +28,8 @@ class DrawingMemory:
     last_question: Optional[str] = None  # Store the last question asked by LLM
 
     def add_strokes(self, strokes: List[List[Tuple[float, float]]], 
-                   labels: Optional[Dict[str, str]] = None) -> List[int]:
+                   labels: Optional[Dict[str, str]] = None,
+                   state: str = "confirmed") -> List[int]:
         """
         Add new strokes to history.
         Automatically numbers shapes (square_1, square_2, etc.) and generates side anchors.
@@ -61,7 +63,7 @@ class DrawingMemory:
                 shape_counts[base_label] = shape_counts.get(base_label, 0) + 1
                 label = numbered_label
             
-            stroke = Stroke(id=stroke_id, points=points, label=label)
+            stroke = Stroke(id=stroke_id, points=points, label=label, state=state)
             self.strokes_history.append(stroke)
             stroke_ids.append(stroke_id)
             self._next_stroke_id += 1
@@ -232,9 +234,23 @@ class DrawingMemory:
                     shape_anchors[shape_key] = []
                 if isinstance(value, (list, tuple)) and len(value) == 2:
                     from config import GRID_SIZE
-                    grid_x = int(value[0] * GRID_SIZE)
-                    grid_y = int(value[1] * GRID_SIZE)
-                    shape_anchors[shape_key].append((name, f"({value[0]:.3f}, {value[1]:.3f})=grid({grid_x},{grid_y})"))
+                    # Handle nested lists (e.g., [[x, y]] instead of [x, y])
+                    if isinstance(value[0], (list, tuple)):
+                        # Value is nested: [[x, y]]
+                        coord_x = value[0][0] if len(value[0]) > 0 else 0.0
+                        coord_y = value[0][1] if len(value[0]) > 1 else 0.0
+                    else:
+                        # Value is flat: [x, y]
+                        coord_x = value[0]
+                        coord_y = value[1]
+                    
+                    # Ensure coordinates are numbers
+                    if isinstance(coord_x, (int, float)) and isinstance(coord_y, (int, float)):
+                        grid_x = int(coord_x * GRID_SIZE)
+                        grid_y = int(coord_y * GRID_SIZE)
+                        shape_anchors[shape_key].append((name, f"({coord_x:.3f}, {coord_y:.3f})=grid({grid_x},{grid_y})"))
+                    else:
+                        shape_anchors[shape_key].append((name, str(value)))
                 else:
                     shape_anchors[shape_key].append((name, str(value)))
             
@@ -253,6 +269,41 @@ class DrawingMemory:
     def reset_stop_flag(self) -> None:
         """Reset the stop flag."""
         self.stop_flag = False
+    
+    def get_preview_strokes(self) -> List[Stroke]:
+        """Get all strokes in preview state."""
+        return [s for s in self.strokes_history if s.state == "preview"]
+    
+    def confirm_preview_strokes(self) -> int:
+        """
+        Confirm all preview strokes (change state to 'confirmed').
+        Returns number of strokes confirmed.
+        """
+        count = 0
+        for stroke in self.strokes_history:
+            if stroke.state == "preview":
+                stroke.state = "confirmed"
+                count += 1
+        return count
+    
+    def reject_preview_strokes(self) -> int:
+        """
+        Reject and remove all preview strokes.
+        Returns number of strokes removed.
+        """
+        preview_strokes = [s for s in self.strokes_history if s.state == "preview"]
+        count = len(preview_strokes)
+        
+        # Remove preview strokes
+        self.strokes_history = [s for s in self.strokes_history if s.state != "preview"]
+        
+        # Remove from features
+        for stroke in preview_strokes:
+            for feature_data in self.features.values():
+                if stroke.id in feature_data.get("stroke_ids", []):
+                    feature_data["stroke_ids"].remove(stroke.id)
+        
+        return count
 
     def undo_last_strokes(self, count: int = 1) -> None:
         """

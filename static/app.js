@@ -10,6 +10,8 @@ let isProcessing = false;
 let canvas, ctx;
 let currentStrokes = [];
 let systemInitialized = false;
+let previewMode = true; // Default to preview mode
+let hasPreviewStrokes = false;
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', () => {
@@ -238,13 +240,26 @@ function drawStrokes(strokes) {
     // Clear canvas first to redraw everything from memory
     clearCanvas();
     
+    // Count preview strokes
+    let previewCount = 0;
+    
     // Draw all strokes from memory (complete state)
     strokes.forEach((stroke, index) => {
         if (stroke.points && stroke.points.length > 0) {
-            console.log(`Drawing stroke ${index} (ID: ${stroke.id}) with ${stroke.points.length} points`);
-            drawStroke(stroke.points);
+            // Choose color based on stroke state
+            const color = stroke.state === 'preview' ? '#ef4444' : '#1e293b'; // red for preview, black for confirmed
+            console.log(`Drawing stroke ${index} (ID: ${stroke.id}, state: ${stroke.state}) with ${stroke.points.length} points in color ${color}`);
+            drawStroke(stroke.points, color);
+            
+            if (stroke.state === 'preview') {
+                previewCount++;
+            }
         }
     });
+    
+    // Update preview controls visibility
+    hasPreviewStrokes = previewCount > 0;
+    updatePreviewControls();
     
     currentStrokes = strokes;
 }
@@ -252,15 +267,15 @@ function drawStrokes(strokes) {
 /**
  * Draw a single stroke
  */
-function drawStroke(points) {
+function drawStroke(points, color = '#1e293b') {
     if (!points || points.length < 2) {
         console.warn('Invalid stroke points:', points);
         return;
     }
     
-    console.log('Drawing stroke with points:', points);
+    console.log('Drawing stroke with points:', points, 'color:', color);
     
-    ctx.strokeStyle = '#1e293b';
+    ctx.strokeStyle = color;
     ctx.lineWidth = 3;
     ctx.beginPath();
     
@@ -354,6 +369,10 @@ async function checkSystemStatus() {
             }
             updateStrokeCount(data.strokes_count || 0);
             
+            // Update preview mode
+            previewMode = data.preview_mode || false;
+            updatePreviewModeDisplay();
+            
             // If there are existing strokes, draw them
             if (data.strokes && Array.isArray(data.strokes) && data.strokes.length > 0) {
                 console.log('Loading existing strokes:', data.strokes.length);
@@ -363,5 +382,144 @@ async function checkSystemStatus() {
         }
     } catch (error) {
         console.error('Error checking status:', error);
+    }
+}
+
+/**
+ * Update preview controls visibility
+ */
+function updatePreviewControls() {
+    const previewControls = document.getElementById('previewControls');
+    if (previewControls) {
+        if (hasPreviewStrokes) {
+            previewControls.classList.remove('hidden');
+            previewControls.classList.add('block');
+        } else {
+            previewControls.classList.remove('block');
+            previewControls.classList.add('hidden');
+        }
+    }
+}
+
+/**
+ * Update preview mode display
+ */
+function updatePreviewModeDisplay() {
+    const toggleBtn = document.getElementById('previewModeToggle');
+    if (toggleBtn) {
+        toggleBtn.textContent = previewMode ? '👁️ Preview Mode' : '🍀 Feeling Lucky';
+        
+        // Remove old classes
+        toggleBtn.className = '';
+        
+        // Add base classes
+        toggleBtn.className = 'px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg ';
+        
+        // Add mode-specific classes
+        if (previewMode) {
+            toggleBtn.className += 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800';
+        } else {
+            toggleBtn.className += 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700';
+        }
+    }
+}
+
+/**
+ * Confirm preview strokes
+ */
+async function confirmPreview() {
+    try {
+        updateStatus('Confirming and sending to hardware...', 'processing');
+        
+        const response = await fetch('/api/preview/confirm', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            displayAssistantOutput(data.message);
+            
+            // Redraw with confirmed strokes (black)
+            if (data.strokes) {
+                clearCanvas();
+                drawStrokes(data.strokes);
+            }
+            
+            updateStatus('Ready - Enter another instruction', 'ready');
+        } else {
+            displayAssistantOutput('Error: ' + (data.message || data.error));
+            updateStatus('Error occurred', 'error');
+        }
+    } catch (error) {
+        console.error('Error confirming preview:', error);
+        displayAssistantOutput('Failed to confirm preview');
+        updateStatus('Error occurred', 'error');
+    }
+}
+
+/**
+ * Reject preview strokes
+ */
+async function rejectPreview() {
+    try {
+        updateStatus('Rejecting preview...', 'processing');
+        
+        const response = await fetch('/api/preview/reject', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            displayAssistantOutput(data.message + '. What would you like to draw instead?');
+            
+            // Redraw without preview strokes
+            if (data.strokes) {
+                clearCanvas();
+                drawStrokes(data.strokes);
+            }
+            
+            updateStatus('Ready - Enter another instruction', 'ready');
+        } else {
+            displayAssistantOutput('Error: ' + (data.message || data.error));
+            updateStatus('Error occurred', 'error');
+        }
+    } catch (error) {
+        console.error('Error rejecting preview:', error);
+        displayAssistantOutput('Failed to reject preview');
+        updateStatus('Error occurred', 'error');
+    }
+}
+
+/**
+ * Toggle preview mode
+ */
+async function togglePreviewMode() {
+    try {
+        const response = await fetch('/api/preview/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            previewMode = data.preview_mode;
+            updatePreviewModeDisplay();
+            displayAssistantOutput(data.message);
+        } else {
+            console.error('Error toggling preview mode:', data.error);
+        }
+    } catch (error) {
+        console.error('Error toggling preview mode:', error);
     }
 }

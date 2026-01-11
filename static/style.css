@@ -360,6 +360,74 @@ main {
     font-weight: bold;
 }
 
+/* Preview Controls */
+.preview-controls {
+    background: rgba(239, 68, 68, 0.1);
+    border: 2px solid var(--error-color);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+}
+
+.preview-controls h3 {
+    font-size: 1.2rem;
+    margin-bottom: 10px;
+    color: var(--error-color);
+}
+
+.preview-message {
+    color: var(--text-secondary);
+    margin-bottom: 15px;
+    font-size: 0.95rem;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn-confirm {
+    background: linear-gradient(135deg, var(--success-color), #059669);
+    color: white;
+}
+
+.btn-reject {
+    background: linear-gradient(135deg, var(--error-color), #dc2626);
+    color: white;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #475569, #334155);
+    color: white;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
 /* System Status */
 .system-status {
     background: var(--surface-color);
@@ -378,12 +446,18 @@ main {
 .status-item {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 10px 0;
     border-bottom: 1px solid var(--border-color);
 }
 
 .status-item:last-child {
     border-bottom: none;
+    padding-top: 15px;
+}
+
+.status-item button {
+    width: 100%;
 }
 
 .status-label {

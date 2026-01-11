@@ -15,7 +15,8 @@ from agent.llm_wrapper import LLMWrapper
 from execution.plotter_driver import PlotterDriver
 from execution.coordinate_mapper import CoordinateMapper
 from state.memory import DrawingMemory
-from config import LLM_PROVIDER, LLM_MODEL, SIMULATION_MODE
+from config import LLM_PROVIDER, LLM_MODEL, SIMULATION_MODE, PREVIEW_MODE
+import config
 from utils.logger import setup_logger
 
 logger = setup_logger("webapp")
@@ -70,16 +71,21 @@ def get_status():
         {
             "id": s.id,
             "points": s.points,
-            "label": s.label
+            "label": s.label,
+            "state": s.state
         }
         for s in drawing_system.memory.strokes_history
     ]
     
+    preview_strokes = drawing_system.memory.get_preview_strokes()
+    
     return jsonify({
         "status": "ready",
         "strokes_count": len(drawing_system.memory.strokes_history),
+        "preview_count": len(preview_strokes),
         "strokes": strokes,
-        "simulation_mode": SIMULATION_MODE
+        "simulation_mode": SIMULATION_MODE,
+        "preview_mode": PREVIEW_MODE
     })
 
 
@@ -107,16 +113,20 @@ def process_instruction():
             {
                 "id": s.id,
                 "points": s.points,
-                "label": s.label
+                "label": s.label,
+                "state": s.state
             }
             for s in drawing_system.memory.strokes_history
         ]
         
-        logger.info(f"Returning {len(strokes)} strokes to frontend, message: {response[:100] if response else 'None'}...")
+        preview_strokes = drawing_system.memory.get_preview_strokes()
+        
+        logger.info(f"Returning {len(strokes)} strokes to frontend ({len(preview_strokes)} in preview), message: {response[:100] if response else 'None'}...")
         
         # Emit update via WebSocket immediately (non-blocking)
         socketio.emit('drawing_update', {
             'strokes': strokes,
+            'preview_count': len(preview_strokes),
             'state': state_summary,
             'message': response
         })
@@ -126,6 +136,8 @@ def process_instruction():
             "success": True,
             "message": response,
             "strokes": strokes,
+            "preview_count": len(preview_strokes),
+            "preview_mode": PREVIEW_MODE,
             "state": state_summary
         })
         
@@ -149,6 +161,118 @@ def reset():
         return jsonify({"success": True, "message": "Drawing reset"})
     except Exception as e:
         logger.error(f"Error resetting: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/preview/confirm', methods=['POST'])
+def confirm_preview():
+    """Confirm preview strokes and send to hardware."""
+    if drawing_system is None:
+        return jsonify({"error": "System not initialized"}), 503
+    
+    try:
+        preview_strokes = drawing_system.memory.get_preview_strokes()
+        
+        if not preview_strokes:
+            return jsonify({"success": False, "message": "No preview strokes to confirm"}), 400
+        
+        logger.info(f"Confirming {len(preview_strokes)} preview strokes")
+        
+        # Execute preview strokes on hardware
+        stroke_points = [s.points for s in preview_strokes]
+        drawing_system._execute_strokes_chunked(stroke_points)
+        
+        # Mark as confirmed in memory
+        count = drawing_system.memory.confirm_preview_strokes()
+        
+        # Get updated strokes
+        strokes = [
+            {
+                "id": s.id,
+                "points": s.points,
+                "label": s.label,
+                "state": s.state
+            }
+            for s in drawing_system.memory.strokes_history
+        ]
+        
+        # Emit update
+        socketio.emit('preview_confirmed', {
+            'strokes': strokes,
+            'count': count
+        })
+        
+        return jsonify({
+            "success": True,
+            "message": f"Confirmed {count} strokes and sent to hardware",
+            "strokes": strokes
+        })
+        
+    except Exception as e:
+        logger.error(f"Error confirming preview: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/preview/reject', methods=['POST'])
+def reject_preview():
+    """Reject and remove preview strokes."""
+    if drawing_system is None:
+        return jsonify({"error": "System not initialized"}), 503
+    
+    try:
+        count = drawing_system.memory.reject_preview_strokes()
+        
+        if count == 0:
+            return jsonify({"success": False, "message": "No preview strokes to reject"}), 400
+        
+        logger.info(f"Rejected and removed {count} preview strokes")
+        
+        # Get updated strokes
+        strokes = [
+            {
+                "id": s.id,
+                "points": s.points,
+                "label": s.label,
+                "state": s.state
+            }
+            for s in drawing_system.memory.strokes_history
+        ]
+        
+        # Emit update
+        socketio.emit('preview_rejected', {
+            'strokes': strokes,
+            'count': count
+        })
+        
+        return jsonify({
+            "success": True,
+            "message": f"Rejected {count} strokes",
+            "strokes": strokes
+        })
+        
+    except Exception as e:
+        logger.error(f"Error rejecting preview: {e}", exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/preview/toggle', methods=['POST'])
+def toggle_preview_mode():
+    """Toggle preview mode on/off."""
+    try:
+        # Toggle the config value
+        config.PREVIEW_MODE = not config.PREVIEW_MODE
+        
+        mode_name = "Preview Mode" if config.PREVIEW_MODE else "Feeling Lucky Mode"
+        logger.info(f"Switched to {mode_name}")
+        
+        return jsonify({
+            "success": True,
+            "preview_mode": config.PREVIEW_MODE,
+            "message": f"Switched to {mode_name}"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error toggling preview mode: {e}")
         return jsonify({"error": str(e)}), 500
 
 

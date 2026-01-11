@@ -24,7 +24,7 @@ DRAWING_BOX = {
 }
 
 # Safety Constraints
-MAX_STROKES_PER_STEP = 5
+MAX_STROKES_PER_STEP = 20  # Increased to allow more complex drawings
 MAX_POINTS_PER_STROKE = 50
 MAX_TOTAL_POINTS_PER_STEP = 200
 
@@ -41,6 +41,7 @@ GRID_SIZE = 10  # 10x10 grid (100 cells total)
 # Execution Settings
 CHUNK_SIZE = 2  # Execute N strokes per chunk before checking stop flag
 SIMULATION_MODE = os.getenv("SIMULATION_MODE", "true").lower() == "true"
+PREVIEW_MODE = os.getenv("PREVIEW_MODE", "true").lower() == "true"  # Show preview before sending to hardware
 
 # Agent Settings
 USE_LANGCHAIN_AGENT = os.getenv("USE_LANGCHAIN_AGENT", "true").lower() == "true"  # Use LangChain agent or legacy system

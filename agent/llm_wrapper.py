@@ -31,11 +31,41 @@ class LLMResponse:
             stroke_tuples = [(float(p[0]), float(p[1])) for p in stroke]
             strokes.append(stroke_tuples)
         
+        # Handle case where plan/components are at root level (wrong format)
+        anchors = data.get("anchors", {})
+        if "plan" in data and "plan" not in anchors:
+            # Plan is at root level - move it to anchors
+            anchors = anchors.copy() if anchors else {}
+            anchors["plan"] = data["plan"]
+            if "components" in data:
+                anchors["components"] = data["components"]
+            if "current_stage" in data:
+                anchors["current_stage"] = data["current_stage"]
+            else:
+                # Default to planning stage (0) if missing
+                anchors["current_stage"] = 0
+            if "total_stages" in data:
+                anchors["total_stages"] = data["total_stages"]
+            else:
+                # Default to 1 stage if missing
+                anchors["total_stages"] = 1
+        
+        # Generate assistant_message from plan if missing
+        assistant_message = data.get("assistant_message")
+        if not assistant_message or assistant_message == "Ready for next instruction.":
+            # Check if we have a plan
+            plan = anchors.get("plan") or data.get("plan")
+            if plan:
+                # Generate message from plan
+                assistant_message = f"{plan} Should I proceed?"
+            else:
+                assistant_message = "Ready for next instruction."
+        
         return cls(
             strokes=strokes,
-            anchors=data.get("anchors", {}),
+            anchors=anchors,
             labels=data.get("labels", {}),
-            assistant_message=data.get("assistant_message", "Ready for next instruction."),
+            assistant_message=assistant_message,
             done=data.get("done", False)
         )
 
@@ -116,14 +146,25 @@ class LLMWrapper:
                 data = json.loads(json_str)
                 
                 # Log raw response for debugging
-                logger.debug(f"LLM raw JSON response: {json.dumps(data, indent=2)[:500]}...")
+                logger.info(f"LLM raw JSON response: {json.dumps(data, indent=2)[:1000]}...")
                 
                 # Validate and create response object
                 llm_response = LLMResponse.from_dict(data)
                 
                 # Log assistant message for debugging
                 if llm_response.assistant_message:
-                    logger.debug(f"LLM assistant_message: {llm_response.assistant_message}")
+                    logger.info(f"LLM assistant_message: {llm_response.assistant_message}")
+                    # Check if it's a generic message
+                    generic_patterns = [
+                        "ready for next instruction",
+                        "i need more information",
+                        "could you clarify",
+                        "can you clarify",
+                        "please clarify"
+                    ]
+                    msg_lower = llm_response.assistant_message.lower()
+                    if any(pattern in msg_lower for pattern in generic_patterns) and "?" not in llm_response.assistant_message:
+                        logger.warning(f"LLM returned generic message without specific question: {llm_response.assistant_message}")
                 else:
                     logger.warning("LLM returned empty assistant_message!")
                 
@@ -214,10 +255,11 @@ class LLMWrapper:
         text = re.sub(r'```json\s*', '', text, flags=re.IGNORECASE)
         text = re.sub(r'```\s*', '', text)
         
-        # Remove single-line comments (// comment)
-        # But be careful - // inside strings should be preserved
-        # Simple approach: remove // comments at end of lines (after closing brackets/braces)
-        text = re.sub(r'(\]|})\s*//.*?$', r'\1', text, flags=re.MULTILINE)
+        # Remove single-line comments (// comment) - more aggressive
+        # Remove // comments that appear after ], }, or , on the same line
+        text = re.sub(r'(\]|}|,)\s*//.*?$', r'\1', text, flags=re.MULTILINE)
+        # Also remove // comments at start of lines (but preserve strings)
+        text = re.sub(r'^\s*//.*?$', '', text, flags=re.MULTILINE)
         
         # Remove multi-line comments (/* comment */)
         text = re.sub(r'/\*.*?\*/', '', text, flags=re.DOTALL)
@@ -231,7 +273,8 @@ class LLMWrapper:
             # Return the longest match (most likely the full JSON)
             candidate = max(matches, key=len)
             # Clean up candidate (remove any remaining comments)
-            candidate = re.sub(r'(\]|})\s*//.*?$', r'\1', candidate, flags=re.MULTILINE)
+            candidate = re.sub(r'(\]|}|,)\s*//.*?$', r'\1', candidate, flags=re.MULTILINE)
+            candidate = re.sub(r'^\s*//.*?$', '', candidate, flags=re.MULTILINE)
             candidate = re.sub(r'/\*.*?\*/', '', candidate, flags=re.DOTALL)
             # Try to validate it's actually JSON
             try:
@@ -253,7 +296,8 @@ class LLMWrapper:
                     if brace_count == 0:
                         candidate = text[start_idx:i+1]
                         # Remove comments from candidate
-                        candidate = re.sub(r'(\]|})\s*//.*?$', r'\1', candidate, flags=re.MULTILINE)
+                        candidate = re.sub(r'(\]|}|,)\s*//.*?$', r'\1', candidate, flags=re.MULTILINE)
+                        candidate = re.sub(r'^\s*//.*?$', '', candidate, flags=re.MULTILINE)
                         candidate = re.sub(r'/\*.*?\*/', '', candidate, flags=re.DOTALL)
                         try:
                             json.loads(candidate)
@@ -262,7 +306,8 @@ class LLMWrapper:
                             pass
         
         # If no match, try to parse the whole text (with comments removed)
-        cleaned = re.sub(r'(\]|})\s*//.*?$', r'\1', text.strip(), flags=re.MULTILINE)
+        cleaned = re.sub(r'(\]|}|,)\s*//.*?$', r'\1', text.strip(), flags=re.MULTILINE)
+        cleaned = re.sub(r'^\s*//.*?$', '', cleaned, flags=re.MULTILINE)
         cleaned = re.sub(r'/\*.*?\*/', '', cleaned, flags=re.DOTALL)
         return cleaned
     

@@ -3,77 +3,178 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text Drawing Assistant</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>AI Drawing Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in',
+                        'slide-in': 'slideIn 0.4s ease-out',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-slow': 'bounce 2s infinite',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideIn: {
+                            '0%': { transform: 'translateY(-10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        }
+        .glass-effect {
+            backdrop-filter: blur(10px);
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
 </head>
-<body>
-    <div class="container">
+<body class="gradient-bg min-h-screen text-gray-100">
+    <div class="container mx-auto px-4 py-6 max-w-7xl">
         <!-- Header -->
-        <header>
-            <h1>🎨 Text Drawing Assistant</h1>
-            <p class="subtitle">Drawing powered by natural language instructions</p>
+        <header class="text-center mb-8 animate-fade-in">
+            <h1 class="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-blue-500 bg-clip-text text-transparent mb-2">
+                🎨 AI Drawing Assistant
+            </h1>
+            <p class="text-gray-400 text-lg">Natural language → Beautiful drawings</p>
         </header>
 
-        <!-- Main Content -->
-        <main>
-            <!-- Drawing Canvas -->
-            <div class="canvas-container">
-                <canvas id="drawingCanvas" width="800" height="800"></canvas>
-                <div class="canvas-overlay" id="statusOverlay">
-                    <div class="status-message" id="statusMessage">Initializing...</div>
+        <!-- Main Content: Two Column Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- LEFT COLUMN: Controls -->
+            <div class="space-y-6 animate-slide-in">
+                
+                <!-- Preview Mode Toggle - AT TOP -->
+                <div class="glass-effect rounded-xl p-4 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-purple-400 mb-1">Drawing Mode</h3>
+                            <p class="text-sm text-gray-400">Preview before hardware or draw directly</p>
+                        </div>
+                        <button 
+                            onclick="togglePreviewMode()" 
+                            id="previewModeToggle"
+                            class="px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+                        >
+                            👁️ Preview Mode
+                        </button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- Control Panel -->
-            <div class="control-panel">
-                <!-- Text Input Section -->
-                <div class="input-section">
-                    <h2>Drawing Assistant</h2>
-                    <div class="input-container">
+                <!-- Input Section -->
+                <div class="glass-effect rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20">
+                    <h2 class="text-2xl font-bold text-blue-400 mb-4">Enter Instruction</h2>
+                    
+                    <div class="flex gap-3 mb-4">
                         <input 
                             type="text" 
-                            id="instructionInput" 
-                            class="instruction-input" 
-                            placeholder="Enter your drawing instruction (e.g., 'draw a square', 'add a triangle on top')"
+                            id="instructionInput"
+                            class="flex-1 px-4 py-3 bg-slate-900/50 border-2 border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all duration-300"
+                            placeholder="e.g., 'draw a cat', 'add a flower to the left'"
                             autocomplete="off"
                         />
-                        <button id="submitButton" class="submit-button">Draw</button>
+                        <button 
+                            id="submitButton"
+                            class="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-blue-500/50"
+                        >
+                            Draw
+                        </button>
                     </div>
                     
-                    <!-- Assistant Response Display -->
-                    <div class="response-output" id="responseOutput">
-                        <div class="output-label">Assistant says:</div>
-                        <div class="output-text" id="assistantOutput">Ready! Enter a drawing instruction above.</div>
+                    <!-- Assistant Response -->
+                    <div class="bg-slate-900/50 rounded-lg p-4 border-l-4 border-blue-500 transition-all duration-300">
+                        <div class="text-xs text-gray-400 uppercase tracking-wide mb-2">Assistant Says:</div>
+                        <div id="assistantOutput" class="text-gray-200 leading-relaxed">
+                            Ready! Enter a drawing instruction above.
+                        </div>
                     </div>
                 </div>
 
-                <!-- Instructions -->
-                <div class="instructions">
-                    <h3>How to Use</h3>
-                    <ul>
-                        <li>Type your drawing instruction in the text box above</li>
-                        <li>Examples: "draw a square", "add a triangle on top of the first square"</li>
-                        <li>If the assistant needs clarification, it will ask a question</li>
-                        <li>Answer the question and the assistant will continue</li>
-                        <li>Watch your drawing appear on the canvas in real-time!</li>
-                        <li>You can reference shapes by number: "first square", "second square"</li>
+                <!-- Preview Controls -->
+                <div 
+                    id="previewControls" 
+                    class="glass-effect rounded-xl p-6 border-2 border-red-500/50 hidden transition-all duration-300 hover:shadow-lg hover:shadow-red-500/20 animate-slide-in"
+                >
+                    <h3 class="text-xl font-bold text-red-400 mb-2">⚠️ Preview (Red Strokes)</h3>
+                    <p class="text-gray-400 text-sm mb-4">Review before sending to hardware:</p>
+                    <div class="flex flex-col gap-3">
+                        <button 
+                            onclick="confirmPreview()"
+                            class="w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+                        >
+                            ✅ Looks Good - Draw It!
+                        </button>
+                        <button 
+                            onclick="rejectPreview()"
+                            class="w-full px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+                        >
+                            ❌ Reject - Try Again
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Guide -->
+                <div class="glass-effect rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
+                    <h3 class="text-lg font-semibold text-purple-400 mb-3">Quick Guide</h3>
+                    <ul class="space-y-2 text-sm text-gray-400">
+                        <li class="flex items-start gap-2">
+                            <span class="text-purple-400 mt-0.5">→</span>
+                            <span>Type what you want to draw (e.g., "draw a house")</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-purple-400 mt-0.5">→</span>
+                            <span>Preview mode shows red strokes before drawing</span>
+                        </li>
+                        <li class="flex items-start gap-2">
+                            <span class="text-purple-400 mt-0.5">→</span>
+                            <span>Use "Feeling Lucky" for instant drawing</span>
+                        </li>
                     </ul>
                 </div>
 
                 <!-- System Status -->
-                <div class="system-status">
-                    <h3>System Status</h3>
-                    <div class="status-item">
-                        <span class="status-label">Mode:</span>
-                        <span class="status-value" id="systemMode">Simulation</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Strokes:</span>
-                        <span class="status-value" id="strokeCount">0</span>
+                <div class="glass-effect rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:shadow-gray-500/20">
+                    <h3 class="text-lg font-semibold text-gray-400 mb-4">System Status</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Mode:</span>
+                            <span id="systemMode" class="font-semibold text-blue-400">Simulation</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Strokes:</span>
+                            <span id="strokeCount" class="font-semibold text-green-400">0</span>
+                        </div>
                     </div>
                 </div>
             </div>
-        </main>
+
+            <!-- RIGHT COLUMN: Canvas -->
+            <div class="animate-slide-in" style="animation-delay: 0.1s;">
+                <div class="glass-effect rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20">
+                    <div class="bg-white rounded-lg p-4 shadow-inner">
+                        <canvas 
+                            id="drawingCanvas" 
+                            width="800" 
+                            height="800"
+                            class="w-full h-auto rounded-lg shadow-lg"
+                        ></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->

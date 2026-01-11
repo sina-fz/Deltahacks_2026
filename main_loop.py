@@ -4,11 +4,12 @@ Coordinates UI, LLM, and execution layers.
 """
 from typing import Optional, List, Tuple
 from state.memory import DrawingMemory
-from agent.llm_wrapper import LLMWrapper
-from agent.prompt_builder import build_prompt
+from agent.llm_wrapper import LLMWrapper, LLMResponse
+from agent.prompt_builder import build_prompt, build_repair_prompt
+from agent.semantic_validator import SemanticValidator
 from execution.plotter_driver import PlotterDriver
 from execution.coordinate_mapper import CoordinateMapper, validate_and_clamp_coordinates
-from config import MAX_STROKES_PER_STEP, MAX_POINTS_PER_STROKE, CHUNK_SIZE, USE_LANGCHAIN_AGENT
+from config import MAX_STROKES_PER_STEP, MAX_POINTS_PER_STROKE, CHUNK_SIZE, USE_LANGCHAIN_AGENT, PREVIEW_MODE
 from utils.logger import get_logger
 
 # Conditional import for LangChain agent
@@ -39,6 +40,7 @@ class DrawingSystem:
         self.plotter = plotter
         self.memory = memory or DrawingMemory()
         self.mapper = CoordinateMapper()
+        self.validator = SemanticValidator()
         self.running = False
         
         # Initialize LangChain agent if enabled
@@ -95,10 +97,20 @@ class DrawingSystem:
         confirmation_words = ["yes", "ok", "okay", "continue", "proceed", "go ahead"]
         if instruction.lower().strip() in confirmation_words:
             # Check if there's a plan in anchors
+            logger.info(f"Checking for plan in memory. Anchors: {list(self.memory.anchors.keys())}")
             if "plan" in self.memory.anchors:
-                logger.info("User confirmed, continuing multi-stage drawing")
-                # Let LLM handle the continuation based on plan in anchors
+                logger.info("User confirmed plan - executing drawing")
+                # Modify instruction to tell LLM to execute the plan
+                instruction = "execute the plan and draw all components"
+            elif self.memory.anchors.get("_auto_continue"):
+                # Model indicated it needs to continue - automatically continue
+                logger.info("Auto-continuing multi-step drawing...")
+                # Clear the auto-continue flag
+                del self.memory.anchors["_auto_continue"]
+                # Use a continuation instruction
+                instruction = "continue drawing the remaining components"
             else:
+                logger.warning(f"No plan found in anchors when user confirmed. Available anchors: {list(self.memory.anchors.keys())}")
                 return "I'm ready. What would you like to draw?"
         
         logger.info(f"Processing instruction: {instruction}")
@@ -130,13 +142,30 @@ class DrawingSystem:
             logger.info(f"LLM returned {len(response.strokes)} strokes, {len(response.anchors)} anchors")
             logger.debug(f"LLM assistant_message: {response.assistant_message[:200] if response.assistant_message else 'EMPTY'}...")
             
-            # Check if LLM is showing a plan (planning phase)
-            if not response.strokes and "plan" in response.anchors and response.anchors.get("current_stage") == 0:
+            # SELF-ITERATION: Validate and repair if needed (only if strokes were generated)
+            if response.strokes:
+                response = self._validate_and_repair(instruction, response, max_iterations=1)
+            
+            # Check if we're executing a plan (skip plan detection in this case)
+            is_executing_plan = instruction.lower().strip() in ["execute the plan", "execute the plan and draw all components"]
+            
+            # Check if LLM is showing a plan (planning phase) - but NOT if we're executing
+            # Plan detection: has plan in anchors, no strokes, and either current_stage==0 or current_stage is missing (defaults to planning)
+            has_plan = "plan" in response.anchors
+            is_planning_stage = response.anchors.get("current_stage") == 0 or (has_plan and "current_stage" not in response.anchors)
+            if not is_executing_plan and not response.strokes and has_plan and is_planning_stage:
                 # LLM is showing a plan, waiting for approval
                 plan_text = response.assistant_message or "Here is my plan. Should I proceed?"
                 logger.info(f"LLM showing plan, waiting for user approval: {plan_text[:100]}...")
-                # Store the plan in memory
+                # Store the plan in memory BEFORE returning
+                logger.info(f"Storing plan in memory. Response anchors keys: {list(response.anchors.keys())}")
                 self.memory.update_anchors(response.anchors)
+                logger.info(f"Plan stored. Memory anchors now: {list(self.memory.anchors.keys())}")
+                # Verify plan is stored
+                if "plan" not in self.memory.anchors:
+                    logger.error("CRITICAL: Plan was NOT stored in memory after update_anchors!")
+                else:
+                    logger.info(f"Plan successfully stored: {self.memory.anchors.get('plan', '')[:100]}...")
                 # Store the question so we can recognize approval
                 self.memory.last_question = plan_text
                 return plan_text
@@ -146,11 +175,30 @@ class DrawingSystem:
                 # LLM is asking a clarifying question
                 question_text = response.assistant_message
                 
-                # Check if the message is the default (LLM didn't provide a real question)
+                # Check if the message is generic or empty
+                generic_patterns = [
+                    "ready for next instruction",
+                    "i need more information",
+                    "could you clarify",
+                    "can you clarify",
+                    "please clarify"
+                ]
+                
+                is_generic = False
                 if not question_text or question_text.strip() == "Ready for next instruction.":
-                    # Generate a better default question based on the instruction
-                    question_text = "I need more information to proceed. Could you clarify your request?"
-                    logger.warning("LLM returned default message instead of a question - using fallback")
+                    is_generic = True
+                else:
+                    msg_lower = question_text.lower()
+                    # Check if it's generic AND doesn't have a specific question (no ? or no options)
+                    if any(pattern in msg_lower for pattern in generic_patterns):
+                        if "?" not in question_text or len(question_text) < 50:
+                            is_generic = True
+                
+                if is_generic:
+                    # Instead of asking, just draw with defaults!
+                    logger.warning("LLM returned generic message - forcing draw with defaults instead of asking")
+                    # Return a message that we'll draw with defaults
+                    return "I'll draw with reasonable defaults based on your request. If you'd like something specific, please let me know."
                 else:
                     logger.info(f"LLM asking clarifying question: {question_text[:100]}...")
                 
@@ -171,16 +219,49 @@ class DrawingSystem:
                 # Validate and clamp coordinates
                 validated_strokes = validate_and_clamp_coordinates(response.strokes, self.mapper)
                 
-                # Execute strokes in chunks
-                self._execute_strokes_chunked(validated_strokes)
+                # Determine stroke state based on preview mode
+                stroke_state = "preview" if PREVIEW_MODE else "confirmed"
+                
+                # Execute strokes on hardware only if not in preview mode OR if confirming
+                if not PREVIEW_MODE or stroke_state == "confirmed":
+                    self._execute_strokes_chunked(validated_strokes)
+                else:
+                    logger.info(f"Preview mode: skipping hardware execution for {len(validated_strokes)} strokes")
                 
                 # Update memory
-                stroke_ids = self.memory.add_strokes(validated_strokes, response.labels)
+                stroke_ids = self.memory.add_strokes(validated_strokes, response.labels, state=stroke_state)
                 self.memory.update_anchors(response.anchors)
                 self.memory.update_features(response.labels, stroke_ids)
                 
-                # Check if this is part of a multi-stage drawing
-                if "current_stage" in response.anchors and "total_stages" in response.anchors:
+                # Check if there are more components to draw (incremental drawing)
+                components_remaining = response.anchors.get("components_remaining", [])
+                component_drawn = response.anchors.get("component_drawn")
+                
+                if components_remaining and len(components_remaining) > 0:
+                    # More components to draw - automatically continue
+                    logger.info(f"Incremental drawing: drew {component_drawn}, {len(components_remaining)} components remaining")
+                    logger.info(f"Automatically continuing to draw next component: {components_remaining[0]}")
+                    
+                    # Recursively call process_instruction to draw next component
+                    next_message = self.process_instruction("yes")
+                    
+                    # Return combined message
+                    return f"{response.assistant_message}\n{next_message}"
+                elif component_drawn and (not components_remaining or len(components_remaining) == 0):
+                    # All components drawn - clear plan
+                    logger.info(f"Incremental drawing complete: all components drawn")
+                    if "plan" in self.memory.anchors:
+                        del self.memory.anchors["plan"]
+                    if "components" in self.memory.anchors:
+                        del self.memory.anchors["components"]
+                    if "component_drawn" in self.memory.anchors:
+                        del self.memory.anchors["component_drawn"]
+                    if "components_remaining" in self.memory.anchors:
+                        del self.memory.anchors["components_remaining"]
+                    self.memory.last_question = None
+                
+                # Check if this is part of a multi-stage drawing (legacy support)
+                elif "current_stage" in response.anchors and "total_stages" in response.anchors:
                     current = response.anchors.get("current_stage", 0)
                     total = response.anchors.get("total_stages", 0)
                     if current < total:
@@ -192,6 +273,10 @@ class DrawingSystem:
                             del self.memory.anchors["plan"]
                         if "components" in self.memory.anchors:
                             del self.memory.anchors["components"]
+                        if "component_drawn" in self.memory.anchors:
+                            del self.memory.anchors["component_drawn"]
+                        if "components_remaining" in self.memory.anchors:
+                            del self.memory.anchors["components_remaining"]
                         self.memory.last_question = None
                         logger.info("Multi-stage drawing complete")
                 else:
@@ -208,6 +293,76 @@ class DrawingSystem:
         except Exception as e:
             logger.error(f"Error processing instruction: {e}", exc_info=True)
             return f"An error occurred: {e}. Please try again."
+    
+    def _validate_and_repair(
+        self,
+        instruction: str,
+        response: LLMResponse,
+        max_iterations: int = 2
+    ) -> LLMResponse:
+        """
+        Validate LLM response and repair if needed (self-iteration loop).
+        
+        Args:
+            instruction: User instruction
+            response: Initial LLM response
+            max_iterations: Maximum repair iterations
+        
+        Returns:
+            Best response (original or repaired)
+        """
+        best_response = response
+        best_score = 0.0
+        
+        for iteration in range(max_iterations + 1):
+            # Validate current response
+            existing_strokes = [stroke.points for stroke in self.memory.strokes_history]
+            validation = self.validator.validate(
+                strokes=response.strokes,
+                labels=response.labels,
+                anchors=response.anchors,
+                existing_strokes=existing_strokes,
+                instruction=instruction
+            )
+            
+            logger.info(f"[ITERATION {iteration}] Validation score: {validation.score:.2f}, valid: {validation.valid}")
+            
+            # Track best response
+            if validation.score > best_score:
+                best_score = validation.score
+                best_response = response
+            
+            # If valid, we're done
+            if validation.valid:
+                logger.info(f"[ITERATION {iteration}] Validation PASSED - using this response")
+                return response
+            
+            # If not valid and we have iterations left, try to repair
+            if iteration < max_iterations:
+                logger.info(f"[ITERATION {iteration}] Validation FAILED - attempting repair (iteration {iteration + 1}/{max_iterations})")
+                
+                # Build repair prompt
+                issues_text = validation.get_repair_hints()
+                repair_prompt = build_repair_prompt(
+                    instruction=instruction,
+                    memory=self.memory,
+                    failed_strokes=response.strokes,
+                    failed_labels=response.labels,
+                    failed_anchors=response.anchors,
+                    issues=issues_text
+                )
+                
+                # Call LLM for repair
+                try:
+                    response = self.llm.call_llm(repair_prompt)
+                    logger.info(f"[ITERATION {iteration + 1}] Repair generated {len(response.strokes)} strokes")
+                except Exception as e:
+                    logger.error(f"[ITERATION {iteration + 1}] Repair failed: {e}")
+                    break
+            else:
+                logger.warning(f"[ITERATION {iteration}] Max iterations reached - using best response (score={best_score:.2f})")
+        
+        return best_response
     
     def _execute_strokes_chunked(self, strokes: List[List[Tuple[float, float]]]) -> None:
         """
