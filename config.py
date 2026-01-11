@@ -32,9 +32,18 @@ MAX_TOTAL_POINTS_PER_STEP = 200
 # Internal: normalized [0.0, 1.0]
 # Physical: mapped to DRAWING_BOX
 
+# Grid System
+GRID_SIZE = 10  # 10x10 grid (100 cells total)
+# Each grid cell = 0.1 in normalized coordinates
+# Grid coordinates: (0,0) to (9,9)
+# Conversion: grid(x, y) → normalized(x/10, y/10)
+
 # Execution Settings
 CHUNK_SIZE = 2  # Execute N strokes per chunk before checking stop flag
 SIMULATION_MODE = os.getenv("SIMULATION_MODE", "true").lower() == "true"
+
+# Agent Settings
+USE_LANGCHAIN_AGENT = os.getenv("USE_LANGCHAIN_AGENT", "true").lower() == "true"  # Use LangChain agent or legacy system
 
 # Logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

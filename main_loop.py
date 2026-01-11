@@ -8,8 +8,16 @@ from agent.llm_wrapper import LLMWrapper
 from agent.prompt_builder import build_prompt
 from execution.plotter_driver import PlotterDriver
 from execution.coordinate_mapper import CoordinateMapper, validate_and_clamp_coordinates
-from config import MAX_STROKES_PER_STEP, MAX_POINTS_PER_STROKE, CHUNK_SIZE
+from config import MAX_STROKES_PER_STEP, MAX_POINTS_PER_STROKE, CHUNK_SIZE, USE_LANGCHAIN_AGENT
 from utils.logger import get_logger
+
+# Conditional import for LangChain agent
+try:
+    from agent.langchain_agent import DrawingAgent
+    LANGCHAIN_AGENT_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AGENT_AVAILABLE = False
+    DrawingAgent = None
 
 logger = get_logger(__name__)
 
@@ -23,7 +31,7 @@ class DrawingSystem:
         Initialize the drawing system.
         
         Args:
-            llm_wrapper: LLMWrapper instance
+            llm_wrapper: LLMWrapper instance (used only if not using LangChain agent)
             plotter: PlotterDriver instance
             memory: Optional existing memory (creates new if None)
         """
@@ -32,6 +40,27 @@ class DrawingSystem:
         self.memory = memory or DrawingMemory()
         self.mapper = CoordinateMapper()
         self.running = False
+        
+        # Initialize LangChain agent if enabled
+        self.langchain_agent = None
+        if USE_LANGCHAIN_AGENT and LANGCHAIN_AGENT_AVAILABLE:
+            try:
+                # Check if LangChain is available
+                from agent.langchain_wrapper import LANGCHAIN_AVAILABLE
+                if not LANGCHAIN_AVAILABLE:
+                    logger.warning("LangChain packages not installed. Install with: pip install langchain langchain-openai langchain-anthropic langchain-community")
+                    logger.info("Falling back to legacy system.")
+                else:
+                    self.langchain_agent = DrawingAgent(self.plotter, self.memory)
+                    logger.info("Using LangChain agent")
+            except ImportError as e:
+                logger.warning(f"LangChain packages not available: {e}. Falling back to legacy system.")
+                self.langchain_agent = None
+            except Exception as e:
+                logger.warning(f"Failed to initialize LangChain agent: {e}. Falling back to legacy system.")
+                self.langchain_agent = None
+        elif USE_LANGCHAIN_AGENT and not LANGCHAIN_AGENT_AVAILABLE:
+            logger.warning("LangChain agent not available (import failed). Falling back to legacy system.")
     
     def process_instruction(self, instruction: str) -> str:
         """
@@ -43,6 +72,11 @@ class DrawingSystem:
         Returns:
             Assistant message to display
         """
+        # Use LangChain agent if enabled
+        if self.langchain_agent:
+            return self.langchain_agent.process_instruction(instruction)
+        
+        # Legacy system (original implementation)
         # Check for stop command
         if instruction.lower().strip() in ["stop", "quit", "exit", "done"]:
             self.memory.set_stop_flag(True)
@@ -85,20 +119,30 @@ class DrawingSystem:
                 if len(self.memory.strokes_history) > 0:
                     first_stroke_label = self.memory.strokes_history[0].label or "unlabeled"
                     if first_stroke_label.upper() in state_in_prompt:
-                        logger.info(f"[MEMORY VERIFICATION] ✅ First stroke '{first_stroke_label}' found in prompt")
+                        logger.info(f"[MEMORY VERIFICATION] [OK] First stroke '{first_stroke_label}' found in prompt")
                     else:
-                        logger.warning(f"[MEMORY VERIFICATION] ❌ First stroke '{first_stroke_label}' NOT found in prompt!")
+                        logger.warning(f"[MEMORY VERIFICATION] [FAIL] First stroke '{first_stroke_label}' NOT found in prompt!")
             else:
-                logger.error("[MEMORY VERIFICATION] ❌ CRITICAL: 'CURRENT DRAWING STATE:' section missing from prompt!")
+                logger.error("[MEMORY VERIFICATION] [CRITICAL] 'CURRENT DRAWING STATE:' section missing from prompt!")
             
             # Call LLM
             response = self.llm.call_llm(prompt)
             logger.info(f"LLM returned {len(response.strokes)} strokes, {len(response.anchors)} anchors")
             
-            # Check if LLM is asking a follow-up question (no strokes, not done)
+            # Check if LLM is showing a plan (planning phase)
+            if not response.strokes and "plan" in response.anchors and response.anchors.get("current_stage") == 0:
+                # LLM is showing a plan, waiting for approval
+                logger.info("LLM showing plan, waiting for user approval")
+                # Store the plan in memory
+                self.memory.update_anchors(response.anchors)
+                # Store the question so we can recognize approval
+                self.memory.last_question = response.assistant_message
+                return response.assistant_message
+            
+            # Check if LLM is asking a follow-up question (no strokes, not done, no plan)
             if not response.strokes and not response.done:
-                # LLM is asking a follow-up question
-                logger.info("LLM asking follow-up question")
+                # LLM is asking a clarifying question
+                logger.info("LLM asking clarifying question")
                 # Store the question so we can recognize answers to it
                 self.memory.last_question = response.assistant_message
                 return response.assistant_message
@@ -124,8 +168,24 @@ class DrawingSystem:
                 self.memory.update_anchors(response.anchors)
                 self.memory.update_features(response.labels, stroke_ids)
                 
-                # Clear last question since we've drawn successfully
-                self.memory.last_question = None
+                # Check if this is part of a multi-stage drawing
+                if "current_stage" in response.anchors and "total_stages" in response.anchors:
+                    current = response.anchors.get("current_stage", 0)
+                    total = response.anchors.get("total_stages", 0)
+                    if current < total:
+                        # More stages to go - keep the plan, don't clear question
+                        logger.info(f"Multi-stage drawing: stage {current}/{total} complete")
+                    else:
+                        # All stages complete - clear plan and question
+                        if "plan" in self.memory.anchors:
+                            del self.memory.anchors["plan"]
+                        if "components" in self.memory.anchors:
+                            del self.memory.anchors["components"]
+                        self.memory.last_question = None
+                        logger.info("Multi-stage drawing complete")
+                else:
+                    # Single-stage drawing - clear question
+                    self.memory.last_question = None
                 
                 logger.info(f"Updated memory: {len(self.memory.strokes_history)} total strokes")
             

@@ -172,15 +172,38 @@ class DrawingMemory:
                     center_x = (min_x + max_x) / 2
                     center_y = (min_y + max_y) / 2
                     
-                    # Include actual point coordinates
+                    # Include actual point coordinates with grid coordinates
                     # For strokes with <= 10 points, show all points
                     # For larger strokes, show first 3, ..., last 3
+                    from config import GRID_SIZE
+                    
                     if len(stroke.points) <= 10:
-                        points_str = ", ".join([f"({p[0]:.3f}, {p[1]:.3f})" for p in stroke.points])
+                        points_with_grid = []
+                        for p in stroke.points:
+                            grid_x = int(p[0] * GRID_SIZE)
+                            grid_y = int(p[1] * GRID_SIZE)
+                            points_with_grid.append(f"({p[0]:.3f}, {p[1]:.3f})=grid({grid_x},{grid_y})")
+                        points_str = ", ".join(points_with_grid)
                     else:
-                        first_three = ", ".join([f"({p[0]:.3f}, {p[1]:.3f})" for p in stroke.points[:3]])
-                        last_three = ", ".join([f"({p[0]:.3f}, {p[1]:.3f})" for p in stroke.points[-3:]])
-                        points_str = f"{first_three}, ..., {last_three} ({len(stroke.points)} total points)"
+                        first_three = []
+                        for p in stroke.points[:3]:
+                            grid_x = int(p[0] * GRID_SIZE)
+                            grid_y = int(p[1] * GRID_SIZE)
+                            first_three.append(f"({p[0]:.3f}, {p[1]:.3f})=grid({grid_x},{grid_y})")
+                        last_three = []
+                        for p in stroke.points[-3:]:
+                            grid_x = int(p[0] * GRID_SIZE)
+                            grid_y = int(p[1] * GRID_SIZE)
+                            last_three.append(f"({p[0]:.3f}, {p[1]:.3f})=grid({grid_x},{grid_y})")
+                        points_str = f"{', '.join(first_three)}, ..., {', '.join(last_three)} ({len(stroke.points)} total points)"
+                    
+                    # Calculate grid coordinates for bounding box
+                    grid_min_x = int(min_x * GRID_SIZE)
+                    grid_max_x = int(max_x * GRID_SIZE)
+                    grid_min_y = int(min_y * GRID_SIZE)
+                    grid_max_y = int(max_y * GRID_SIZE)
+                    grid_center_x = int(center_x * GRID_SIZE)
+                    grid_center_y = int(center_y * GRID_SIZE)
                     
                     # Build stroke info line
                     if len(strokes_list) == 1:
@@ -188,7 +211,7 @@ class DrawingMemory:
                     else:
                         parts.append(f"  {label.upper()}_{i} (stroke {i}, ID: {stroke.id}):")
                     
-                    parts.append(f"    Bounding box: center=({center_x:.3f}, {center_y:.3f}), top={max_y:.3f}, bottom={min_y:.3f}, left={min_x:.3f}, right={max_x:.3f}")
+                    parts.append(f"    Bounding box: center=({center_x:.3f}, {center_y:.3f})=grid({grid_center_x},{grid_center_y}), top={max_y:.3f}=grid({grid_max_y}), bottom={min_y:.3f}=grid({grid_min_y}), left={min_x:.3f}=grid({grid_min_x}), right={max_x:.3f}=grid({grid_max_x})")
                     parts.append(f"    Points: [{points_str}]")
         else:
             parts.append("No strokes drawn yet.")
@@ -208,7 +231,10 @@ class DrawingMemory:
                 if shape_key not in shape_anchors:
                     shape_anchors[shape_key] = []
                 if isinstance(value, (list, tuple)) and len(value) == 2:
-                    shape_anchors[shape_key].append((name, f"({value[0]:.3f}, {value[1]:.3f})"))
+                    from config import GRID_SIZE
+                    grid_x = int(value[0] * GRID_SIZE)
+                    grid_y = int(value[1] * GRID_SIZE)
+                    shape_anchors[shape_key].append((name, f"({value[0]:.3f}, {value[1]:.3f})=grid({grid_x},{grid_y})"))
                 else:
                     shape_anchors[shape_key].append((name, str(value)))
             

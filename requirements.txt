@@ -2,6 +2,15 @@
 openai>=1.0.0
 anthropic>=0.18.0
 
+# LangChain dependencies
+# Note: LangChain API changed significantly in 0.1.0+
+# If using older versions, may need to adjust imports
+langchain>=0.1.0,<0.3.0
+langchain-openai>=0.0.5
+langchain-anthropic>=0.1.0
+langchain-community>=0.0.20
+langchain-core>=0.1.0
+
 # Web app dependencies
 flask>=3.0.0
 flask-cors>=4.0.0
