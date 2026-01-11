@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Drawing Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🎨 Text Drawing Assistant</h1>
+            <p class="subtitle">Drawing powered by natural language instructions</p>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Drawing Canvas -->
+            <div class="canvas-container">
+                <canvas id="drawingCanvas" width="800" height="800"></canvas>
+                <div class="canvas-overlay" id="statusOverlay">
+                    <div class="status-message" id="statusMessage">Initializing...</div>
+                </div>
+            </div>
+
+            <!-- Control Panel -->
+            <div class="control-panel">
+                <!-- Text Input Section -->
+                <div class="input-section">
+                    <h2>Drawing Assistant</h2>
+                    <div class="input-container">
+                        <input 
+                            type="text" 
+                            id="instructionInput" 
+                            class="instruction-input" 
+                            placeholder="Enter your drawing instruction (e.g., 'draw a square', 'add a triangle on top')"
+                            autocomplete="off"
+                        />
+                        <button id="submitButton" class="submit-button">Draw</button>
+                    </div>
+                    
+                    <!-- Assistant Response Display -->
+                    <div class="response-output" id="responseOutput">
+                        <div class="output-label">Assistant says:</div>
+                        <div class="output-text" id="assistantOutput">Ready! Enter a drawing instruction above.</div>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="instructions">
+                    <h3>How to Use</h3>
+                    <ul>
+                        <li>Type your drawing instruction in the text box above</li>
+                        <li>Examples: "draw a square", "add a triangle on top of the first square"</li>
+                        <li>If the assistant needs clarification, it will ask a question</li>
+                        <li>Answer the question and the assistant will continue</li>
+                        <li>Watch your drawing appear on the canvas in real-time!</li>
+                        <li>You can reference shapes by number: "first square", "second square"</li>
+                    </ul>
+                </div>
+
+                <!-- System Status -->
+                <div class="system-status">
+                    <h3>System Status</h3>
+                    <div class="status-item">
+                        <span class="status-label">Mode:</span>
+                        <span class="status-value" id="systemMode">Simulation</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Strokes:</span>
+                        <span class="status-value" id="strokeCount">0</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
