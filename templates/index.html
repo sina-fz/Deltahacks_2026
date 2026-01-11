@@ -12,8 +12,11 @@
                     animation: {
                         'fade-in': 'fadeIn 0.5s ease-in',
                         'slide-in': 'slideIn 0.4s ease-out',
+                        'slide-in-left': 'slideInLeft 0.6s ease-out',
+                        'slide-in-right': 'slideInRight 0.6s ease-out',
                         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'bounce-slow': 'bounce 2s infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'float': 'float 3s ease-in-out infinite',
                     },
                     keyframes: {
                         fadeIn: {
@@ -23,6 +26,22 @@
                         slideIn: {
                             '0%': { transform: 'translateY(-10px)', opacity: '0' },
                             '100%': { transform: 'translateY(0)', opacity: '1' },
+                        },
+                        slideInLeft: {
+                            '0%': { transform: 'translateX(-50px)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' },
+                        },
+                        slideInRight: {
+                            '0%': { transform: 'translateX(50px)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' },
+                        },
+                        glow: {
+                            '0%': { boxShadow: '0 0 5px rgba(99, 102, 241, 0.5), 0 0 10px rgba(99, 102, 241, 0.3)' },
+                            '100%': { boxShadow: '0 0 20px rgba(99, 102, 241, 0.8), 0 0 30px rgba(99, 102, 241, 0.5)' },
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' },
                         }
                     }
                 }
@@ -30,152 +49,454 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .gradient-bg {
-            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+        @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Playfair+Display:wght@400;600;700&display=swap');
+        
+        body { 
+            font-family: 'Crimson Text', serif;
+            overflow: hidden;
         }
-        .glass-effect {
-            backdrop-filter: blur(10px);
-            background: rgba(30, 41, 59, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        
+        /* Sketched Paper Background - Black & White */
+        .sketch-bg {
+            background: 
+                #f8f8f8,
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px),
+                repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0, 0, 0, 0.03) 2px, rgba(0, 0, 0, 0.03) 4px);
+            background-size: 100% 100%, 100% 100%, 100% 100%;
+            position: relative;
+        }
+        
+        /* Sketch marks overlay */
+        .sketch-bg::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                /* Cross-hatching */
+                repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(0, 0, 0, 0.02) 20px, rgba(0, 0, 0, 0.02) 21px),
+                repeating-linear-gradient(-45deg, transparent, transparent 20px, rgba(0, 0, 0, 0.02) 20px, rgba(0, 0, 0, 0.02) 21px),
+                /* Random sketch marks */
+                radial-gradient(circle at 15% 25%, rgba(0, 0, 0, 0.03) 0%, transparent 3%),
+                radial-gradient(circle at 85% 75%, rgba(0, 0, 0, 0.03) 0%, transparent 3%),
+                radial-gradient(circle at 50% 10%, rgba(0, 0, 0, 0.02) 0%, transparent 2%),
+                radial-gradient(circle at 20% 80%, rgba(0, 0, 0, 0.02) 0%, transparent 2%);
+            pointer-events: none;
+            opacity: 0.4;
+            animation: pulseSketch 4s ease-in-out infinite;
+        }
+        
+        /* Sketched Paper Panel - Black & White */
+        .sketch-panel {
+            background: #ffffff;
+            border: 2px solid #1a1a1a;
+            box-shadow: 
+                0 4px 20px rgba(0, 0, 0, 0.1),
+                0 0 0 1px rgba(0, 0, 0, 0.05);
+            position: relative;
+        }
+        
+        .sketch-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                /* Cross-hatching */
+                repeating-linear-gradient(45deg, transparent, transparent 15px, rgba(0, 0, 0, 0.03) 15px, rgba(0, 0, 0, 0.03) 16px),
+                repeating-linear-gradient(-45deg, transparent, transparent 15px, rgba(0, 0, 0, 0.03) 15px, rgba(0, 0, 0, 0.03) 16px),
+                /* Sketch marks */
+                radial-gradient(circle at 10% 20%, rgba(0, 0, 0, 0.02) 0%, transparent 2%),
+                radial-gradient(circle at 90% 80%, rgba(0, 0, 0, 0.02) 0%, transparent 2%);
+            pointer-events: none;
+            opacity: 0.5;
+        }
+        
+        /* Scroll/Map Effect for Preview - Black & White */
+        .scroll-panel {
+            background: #ffffff;
+            border: 3px solid #1a1a1a;
+            border-top: 8px solid #1a1a1a;
+            border-bottom: 8px solid #1a1a1a;
+            box-shadow: 
+                0 8px 30px rgba(0, 0, 0, 0.15),
+                inset 0 2px 4px rgba(255, 255, 255, 0.5);
+            position: relative;
+        }
+        
+        .scroll-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(0, 0, 0, 0.04) 20px, rgba(0, 0, 0, 0.04) 21px),
+                repeating-linear-gradient(-45deg, transparent, transparent 20px, rgba(0, 0, 0, 0.04) 20px, rgba(0, 0, 0, 0.04) 21px);
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        
+        .scroll-panel::after {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 0;
+            right: 0;
+            height: 8px;
+            background: repeating-linear-gradient(90deg, 
+                #1a1a1a 0px, #1a1a1a 8px,
+                #333 8px, #333 16px,
+                #1a1a1a 16px, #1a1a1a 24px);
+        }
+        
+        /* Sketched Button - Black & White */
+        .sketch-button {
+            background: #ffffff;
+            border: 2px solid #1a1a1a;
+            color: #1a1a1a;
+            box-shadow: 
+                0 4px 8px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            position: relative;
+        }
+        
+        .sketch-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0, 0, 0, 0.02) 5px, rgba(0, 0, 0, 0.02) 6px);
+            pointer-events: none;
+            opacity: 0.3;
+        }
+        
+        .sketch-button:hover {
+            background: #f5f5f5;
+            box-shadow: 
+                0 6px 12px rgba(0, 0, 0, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.9);
+            transform: translateY(-2px);
+        }
+        
+        .sketch-button:active {
+            transform: translateY(0);
+            box-shadow: 
+                0 2px 4px rgba(0, 0, 0, 0.1),
+                inset 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Sketched Input */
+        .sketch-input {
+            background: #ffffff;
+            border: 2px solid #1a1a1a;
+            color: #1a1a1a;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .sketch-input:focus {
+            border-color: #1a1a1a;
+            box-shadow: 
+                inset 0 2px 4px rgba(0, 0, 0, 0.05),
+                0 0 0 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Canvas Container - Black & White */
+        .canvas-paper {
+            background: #ffffff;
+            border: 3px solid #1a1a1a;
+            box-shadow: 
+                0 8px 30px rgba(0, 0, 0, 0.1),
+                inset 0 2px 4px rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Quill Logo SVG */
+        .quill-logo {
+            display: inline-block;
+            width: 60px;
+            height: 60px;
+            margin-right: 16px;
+            vertical-align: middle;
+            animation: sketchDraw 3s ease-in-out infinite;
+        }
+        
+        /* Sketching Animation - Quill Drawing */
+        @keyframes sketchDraw {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+            25% {
+                transform: translateY(-5px) rotate(-5deg);
+                opacity: 0.9;
+            }
+            50% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+            75% {
+                transform: translateY(-3px) rotate(3deg);
+                opacity: 0.95;
+            }
+        }
+        
+        /* Sketching Lines Animation */
+        @keyframes sketchLines {
+            0% {
+                stroke-dashoffset: 100;
+                opacity: 0;
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                stroke-dashoffset: 0;
+                opacity: 0.8;
+            }
+        }
+        
+        .sketch-line {
+            stroke-dasharray: 100;
+            animation: sketchLines 2s ease-in-out infinite;
+        }
+        
+        /* Pulsing Sketch Marks */
+        @keyframes pulseSketch {
+            0%, 100% {
+                opacity: 0.3;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.6;
+                transform: scale(1.1);
+            }
+        }
+        
+        .sketch-mark {
+            animation: pulseSketch 2s ease-in-out infinite;
+        }
+        
+        /* Smooth Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideInLeft {
+            from { transform: translateX(-30px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes slideInRight {
+            from { transform: translateX(30px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes unrollScroll {
+            from { 
+                transform: scaleY(0);
+                opacity: 0;
+            }
+            to { 
+                transform: scaleY(1);
+                opacity: 1;
+            }
+        }
+        
+        .animate-unroll {
+            animation: unrollScroll 0.5s ease-out;
+            transform-origin: top;
         }
     </style>
 </head>
-<body class="gradient-bg min-h-screen text-gray-100">
-    <div class="container mx-auto px-4 py-6 max-w-7xl">
-        <!-- Header -->
-        <header class="text-center mb-8 animate-fade-in">
-            <h1 class="text-5xl font-bold bg-gradient-to-r from-purple-400 via-pink-500 to-blue-500 bg-clip-text text-transparent mb-2">
-                🎨 AI Drawing Assistant
+<body class="sketch-bg h-screen w-screen overflow-hidden text-gray-900" style="position: relative;">
+    <!-- Header: Centered Title at Top -->
+    <div class="w-full py-6 px-6 animate-fade-in" style="position: relative; z-index: 1;">
+        <div class="text-center">
+            <h1 class="text-6xl font-bold mb-2 inline-flex items-center justify-center" style="font-family: 'Playfair Display', serif; color: #1a1a1a; text-shadow: 2px 2px 4px rgba(0,0,0,0.1);">
+                <svg class="quill-logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Quill Pen -->
+                    <path d="M 20 20 L 25 15 L 30 20 L 28 25 L 25 30 L 20 35 L 15 30 L 12 25 L 15 20 Z" 
+                          fill="none" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <!-- Quill Shaft -->
+                    <line x1="25" y1="30" x2="25" y2="80" stroke="#1a1a1a" stroke-width="2.5" stroke-linecap="round"/>
+                    <!-- Quill Tip -->
+                    <path d="M 20 35 L 25 30 L 30 35 L 25 40 Z" fill="#1a1a1a" opacity="0.8"/>
+                    <!-- Feather Details -->
+                    <path d="M 15 25 Q 10 20 5 15" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+                    <path d="M 18 28 Q 12 25 7 20" fill="none" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+                    <path d="M 35 25 Q 40 20 45 15" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+                    <path d="M 32 28 Q 38 25 43 20" fill="none" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" opacity="0.5"/>
+                    <!-- Ink Drop -->
+                    <circle cx="25" cy="85" r="3" fill="#1a1a1a" opacity="0.7"/>
+                    <path d="M 25 88 Q 25 92 22 95" fill="none" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+                    <!-- Sketching Lines Animation -->
+                    <path class="sketch-line" d="M 5 50 Q 15 45 25 50" fill="none" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" opacity="0.4"/>
+                    <path class="sketch-line" d="M 30 50 Q 40 55 50 50" fill="none" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" opacity="0.4" style="animation-delay: 0.5s;"/>
+                    <path class="sketch-line" d="M 55 50 Q 65 45 75 50" fill="none" stroke="#1a1a1a" stroke-width="1" stroke-linecap="round" opacity="0.4" style="animation-delay: 1s;"/>
+                </svg>
+                Drawing Assistant
             </h1>
-            <p class="text-gray-400 text-lg">Natural language → Beautiful drawings</p>
-        </header>
-
-        <!-- Main Content: Two Column Layout -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Subtle sketch marks decoration -->
+            <div class="flex justify-center items-center gap-2 mt-2">
+                <span class="sketch-mark inline-block w-1 h-1 bg-gray-400 rounded-full"></span>
+                <span class="sketch-mark inline-block w-1 h-1 bg-gray-400 rounded-full" style="animation-delay: 0.3s;"></span>
+                <span class="sketch-mark inline-block w-1 h-1 bg-gray-400 rounded-full" style="animation-delay: 0.6s;"></span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content: Left and Right Panels Below Title -->
+    <div class="grid grid-cols-2 h-[calc(100vh-120px)] w-screen gap-6 px-6 pb-6">
             <!-- LEFT COLUMN: Controls -->
-            <div class="space-y-6 animate-slide-in">
+            <div class="h-full overflow-y-auto space-y-5 animate-slide-in-left" style="position: relative; z-index: 1;">
                 
                 <!-- Preview Mode Toggle - AT TOP -->
-                <div class="glass-effect rounded-xl p-4 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
-                    <div class="flex items-center justify-between">
+                <div class="sketch-panel rounded-lg p-5 transition-all duration-300 hover:shadow-lg">
+                    <div class="flex items-center justify-between" style="position: relative; z-index: 1;">
                         <div>
-                            <h3 class="text-lg font-semibold text-purple-400 mb-1">Drawing Mode</h3>
-                            <p class="text-sm text-gray-400">Preview before hardware or draw directly</p>
+                            <h3 class="text-2xl font-bold mb-2" style="font-family: 'Playfair Display', serif; color: #1a1a1a;">Drawing Mode</h3>
+                            <p class="text-base text-gray-700">Preview before hardware or draw directly</p>
                         </div>
                         <button 
                             onclick="togglePreviewMode()" 
                             id="previewModeToggle"
-                            class="px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+                            class="sketch-button px-6 py-3 text-base rounded-lg transition-all duration-300"
+                            style="position: relative; z-index: 1;"
                         >
-                            👁️ Preview Mode
+                            Preview Mode
                         </button>
                     </div>
                 </div>
 
                 <!-- Input Section -->
-                <div class="glass-effect rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20">
-                    <h2 class="text-2xl font-bold text-blue-400 mb-4">Enter Instruction</h2>
+                <div class="sketch-panel rounded-lg p-6 transition-all duration-300 hover:shadow-lg" style="position: relative; z-index: 1;">
+                    <h2 class="text-3xl font-bold mb-5" style="font-family: 'Playfair Display', serif; color: #1a1a1a;">Enter Instruction</h2>
                     
-                    <div class="flex gap-3 mb-4">
+                    <div class="flex gap-4 mb-5">
                         <input 
                             type="text" 
                             id="instructionInput"
-                            class="flex-1 px-4 py-3 bg-slate-900/50 border-2 border-slate-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all duration-300"
+                            class="sketch-input flex-1 px-5 py-4 text-lg rounded-lg transition-all duration-300 placeholder-gray-500"
                             placeholder="e.g., 'draw a cat', 'add a flower to the left'"
                             autocomplete="off"
                         />
                         <button 
                             id="submitButton"
-                            class="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-blue-500/50"
+                            class="sketch-button px-10 py-4 text-lg rounded-lg transition-all duration-300"
+                            style="position: relative; z-index: 1;"
                         >
                             Draw
                         </button>
                     </div>
                     
                     <!-- Assistant Response -->
-                    <div class="bg-slate-900/50 rounded-lg p-4 border-l-4 border-blue-500 transition-all duration-300">
-                        <div class="text-xs text-gray-400 uppercase tracking-wide mb-2">Assistant Says:</div>
-                        <div id="assistantOutput" class="text-gray-200 leading-relaxed">
+                    <div class="sketch-panel rounded-lg p-5 border-l-4 border-gray-900 transition-all duration-300" style="position: relative; z-index: 1;">
+                        <div class="text-sm text-gray-700 uppercase tracking-wider mb-3 font-semibold" style="font-family: 'Playfair Display', serif;">Assistant Says:</div>
+                        <div id="assistantOutput" class="text-gray-900 leading-relaxed text-lg">
                             Ready! Enter a drawing instruction above.
                         </div>
                     </div>
                 </div>
 
-                <!-- Preview Controls -->
+                <!-- Preview Controls - Scroll Style -->
                 <div 
                     id="previewControls" 
-                    class="glass-effect rounded-xl p-6 border-2 border-red-500/50 hidden transition-all duration-300 hover:shadow-lg hover:shadow-red-500/20 animate-slide-in"
+                    class="scroll-panel rounded-lg p-6 hidden transition-all duration-300 animate-unroll"
+                    style="position: relative; z-index: 1;"
                 >
-                    <h3 class="text-xl font-bold text-red-400 mb-2">⚠️ Preview (Red Strokes)</h3>
-                    <p class="text-gray-400 text-sm mb-4">Review before sending to hardware:</p>
-                    <div class="flex flex-col gap-3">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-3" style="font-family: 'Playfair Display', serif;">Preview (Red Strokes)</h3>
+                    <p class="text-gray-700 text-base mb-5">Review before sending to hardware:</p>
+                    <div class="flex flex-col gap-4">
                         <button 
                             onclick="confirmPreview()"
-                            class="w-full px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+                            class="sketch-button w-full px-6 py-4 text-lg rounded-lg transition-all duration-300"
+                            style="position: relative; z-index: 1;"
                         >
-                            ✅ Looks Good - Draw It!
+                            Looks Good - Draw It!
                         </button>
                         <button 
                             onclick="rejectPreview()"
-                            class="w-full px-6 py-3 bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg"
+                            class="sketch-button w-full px-6 py-4 text-lg rounded-lg transition-all duration-300"
+                            style="position: relative; z-index: 1;"
                         >
-                            ❌ Reject - Try Again
+                            Reject - Try Again
                         </button>
                     </div>
                 </div>
 
                 <!-- Quick Guide -->
-                <div class="glass-effect rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20">
-                    <h3 class="text-lg font-semibold text-purple-400 mb-3">Quick Guide</h3>
-                    <ul class="space-y-2 text-sm text-gray-400">
-                        <li class="flex items-start gap-2">
-                            <span class="text-purple-400 mt-0.5">→</span>
+                <div class="sketch-panel rounded-lg p-6 transition-all duration-300 hover:shadow-lg" style="position: relative; z-index: 1;">
+                    <h3 class="text-2xl font-bold mb-4" style="font-family: 'Playfair Display', serif; color: #1a1a1a;">Quick Guide</h3>
+                    <ul class="space-y-3 text-base text-gray-700">
+                        <li class="flex items-start gap-3">
+                            <span class="text-gray-900 mt-1 text-xl font-bold">→</span>
                             <span>Type what you want to draw (e.g., "draw a house")</span>
                         </li>
-                        <li class="flex items-start gap-2">
-                            <span class="text-purple-400 mt-0.5">→</span>
+                        <li class="flex items-start gap-3">
+                            <span class="text-gray-900 mt-1 text-xl font-bold">→</span>
                             <span>Preview mode shows red strokes before drawing</span>
                         </li>
-                        <li class="flex items-start gap-2">
-                            <span class="text-purple-400 mt-0.5">→</span>
+                        <li class="flex items-start gap-3">
+                            <span class="text-gray-900 mt-1 text-xl font-bold">→</span>
                             <span>Use "Feeling Lucky" for instant drawing</span>
                         </li>
                     </ul>
                 </div>
 
                 <!-- System Status -->
-                <div class="glass-effect rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:shadow-gray-500/20">
-                    <h3 class="text-lg font-semibold text-gray-400 mb-4">System Status</h3>
-                    <div class="space-y-3">
+                <div class="sketch-panel rounded-lg p-6 transition-all duration-300 hover:shadow-lg" style="position: relative; z-index: 1;">
+                    <h3 class="text-2xl font-bold mb-5" style="font-family: 'Playfair Display', serif; color: #1a1a1a;">System Status</h3>
+                    <div class="space-y-4">
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Mode:</span>
-                            <span id="systemMode" class="font-semibold text-blue-400">Simulation</span>
+                            <span class="text-gray-700 text-lg">Mode:</span>
+                            <span id="systemMode" class="font-bold text-gray-900 text-xl">Simulation</span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-gray-400">Strokes:</span>
-                            <span id="strokeCount" class="font-semibold text-green-400">0</span>
+                            <span class="text-gray-700 text-lg">Strokes:</span>
+                            <span id="strokeCount" class="font-bold text-gray-900 text-xl">0</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- RIGHT COLUMN: Canvas -->
-            <div class="animate-slide-in" style="animation-delay: 0.1s;">
-                <div class="glass-effect rounded-xl p-6 transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20">
-                    <div class="bg-white rounded-lg p-4 shadow-inner">
+            <div class="h-full overflow-hidden animate-slide-in-right" style="position: relative; z-index: 1;">
+                <div class="sketch-panel rounded-lg p-6 h-full transition-all duration-300 hover:shadow-lg flex items-center justify-center">
+                    <div class="canvas-paper rounded-lg p-6 w-full h-full flex items-center justify-center relative overflow-hidden">
                         <canvas 
                             id="drawingCanvas" 
                             width="800" 
                             height="800"
-                            class="w-full h-auto rounded-lg shadow-lg"
+                            class="max-w-full max-h-full rounded-lg"
+                            style="box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);"
                         ></canvas>
+                        <!-- Sketch marks overlay with animation -->
+                        <div class="absolute inset-0 opacity-5 pointer-events-none">
+                            <div class="absolute inset-0" style="background-image: 
+                                repeating-linear-gradient(45deg, transparent, transparent 30px, rgba(0, 0, 0, 0.1) 30px, rgba(0, 0, 0, 0.1) 31px),
+                                repeating-linear-gradient(-45deg, transparent, transparent 30px, rgba(0, 0, 0, 0.1) 30px, rgba(0, 0, 0, 0.1) 31px);"></div>
+                            <!-- Animated sketch marks -->
+                            <div class="absolute top-10 left-10 sketch-mark w-2 h-2 bg-gray-300 rounded-full" style="animation-delay: 0s;"></div>
+                            <div class="absolute top-20 right-20 sketch-mark w-1.5 h-1.5 bg-gray-300 rounded-full" style="animation-delay: 0.5s;"></div>
+                            <div class="absolute bottom-20 left-20 sketch-mark w-1 h-1 bg-gray-300 rounded-full" style="animation-delay: 1s;"></div>
+                            <div class="absolute bottom-10 right-10 sketch-mark w-2 h-2 bg-gray-300 rounded-full" style="animation-delay: 1.5s;"></div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
     <!-- Scripts -->
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>

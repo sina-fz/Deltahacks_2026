@@ -75,28 +75,47 @@ function setupTextInput() {
  * Setup canvas for drawing
  */
 function setupCanvas() {
-    // Set canvas size
-    const container = canvas.parentElement;
-    const size = Math.min(800, container.clientWidth - 40);
+    // Set canvas size to fill available space in right column
+    const container = canvas.parentElement.parentElement; // Get the glass-effect container
+    const availableWidth = container.clientWidth - 48; // Account for padding (p-6 = 24px * 2)
+    const availableHeight = container.clientHeight - 48; // Account for padding
+    
+    // Use the smaller dimension to maintain square aspect ratio, but maximize space
+    const size = Math.min(availableWidth, availableHeight, 800);
     canvas.width = size;
     canvas.height = size;
     
-    // Setup drawing context
-    ctx.strokeStyle = '#1e293b';
-    ctx.lineWidth = 2;
+    // Setup drawing context (black ink for sketched look)
+    ctx.strokeStyle = '#1a1a1a'; // Black ink
+    ctx.lineWidth = 2.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
     // Draw grid
     drawGrid();
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        const newSize = Math.min(container.clientWidth - 48, container.clientHeight - 48, 800);
+        if (newSize !== size) {
+            canvas.width = newSize;
+            canvas.height = newSize;
+            drawGrid();
+            // Redraw all strokes
+            if (currentStrokes && currentStrokes.length > 0) {
+                drawStrokes(currentStrokes);
+            }
+        }
+    });
 }
 
 /**
- * Draw grid on canvas
+ * Draw grid on canvas (sketched style - black and white)
  */
 function drawGrid() {
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#cccccc';
+    ctx.lineWidth = 0.5;
+    ctx.globalAlpha = 0.4;
     const step = 40;
     
     // Vertical lines
@@ -114,6 +133,8 @@ function drawGrid() {
         ctx.lineTo(canvas.width, y);
         ctx.stroke();
     }
+    
+    ctx.globalAlpha = 1.0;
 }
 
 /**
@@ -246,8 +267,8 @@ function drawStrokes(strokes) {
     // Draw all strokes from memory (complete state)
     strokes.forEach((stroke, index) => {
         if (stroke.points && stroke.points.length > 0) {
-            // Choose color based on stroke state
-            const color = stroke.state === 'preview' ? '#ef4444' : '#1e293b'; // red for preview, black for confirmed
+            // Choose color based on stroke state (black and white sketched theme)
+            const color = stroke.state === 'preview' ? '#cc0000' : '#1a1a1a'; // red for preview, black for confirmed
             console.log(`Drawing stroke ${index} (ID: ${stroke.id}, state: ${stroke.state}) with ${stroke.points.length} points in color ${color}`);
             drawStroke(stroke.points, color);
             
@@ -265,9 +286,9 @@ function drawStrokes(strokes) {
 }
 
 /**
- * Draw a single stroke
+ * Draw a single stroke (black and white sketched style)
  */
-function drawStroke(points, color = '#1e293b') {
+function drawStroke(points, color = '#1a1a1a') {
     if (!points || points.length < 2) {
         console.warn('Invalid stroke points:', points);
         return;
@@ -276,7 +297,7 @@ function drawStroke(points, color = '#1e293b') {
     console.log('Drawing stroke with points:', points, 'color:', color);
     
     ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     
     // Map normalized coordinates [0,1] to canvas coordinates
@@ -393,9 +414,13 @@ function updatePreviewControls() {
     if (previewControls) {
         if (hasPreviewStrokes) {
             previewControls.classList.remove('hidden');
-            previewControls.classList.add('block');
+            previewControls.classList.add('block', 'animate-unroll');
+            // Remove animation class after animation completes to allow re-triggering
+            setTimeout(() => {
+                previewControls.classList.remove('animate-unroll');
+            }, 500);
         } else {
-            previewControls.classList.remove('block');
+            previewControls.classList.remove('block', 'animate-unroll');
             previewControls.classList.add('hidden');
         }
     }
@@ -407,20 +432,18 @@ function updatePreviewControls() {
 function updatePreviewModeDisplay() {
     const toggleBtn = document.getElementById('previewModeToggle');
     if (toggleBtn) {
-        toggleBtn.textContent = previewMode ? '👁️ Preview Mode' : '🍀 Feeling Lucky';
+        toggleBtn.textContent = previewMode ? 'Preview Mode' : 'Feeling Lucky';
         
         // Remove old classes
         toggleBtn.className = '';
         
-        // Add base classes
-        toggleBtn.className = 'px-6 py-3 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 shadow-lg ';
+        // Add base sketch button classes
+        toggleBtn.className = 'sketch-button px-6 py-3 text-base rounded-lg transition-all duration-300';
+        toggleBtn.style.position = 'relative';
+        toggleBtn.style.zIndex = '1';
         
-        // Add mode-specific classes
-        if (previewMode) {
-            toggleBtn.className += 'bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800';
-        } else {
-            toggleBtn.className += 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700';
-        }
+        // Both modes use same black and white style (sketched look)
+        // The button already has the sketch-button styling
     }
 }
 
