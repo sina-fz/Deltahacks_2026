@@ -123,29 +123,40 @@ class DrawingSystem:
                     else:
                         logger.warning(f"[MEMORY VERIFICATION] [FAIL] First stroke '{first_stroke_label}' NOT found in prompt!")
             else:
-                logger.error("[MEMORY VERIFICATION] [CRITICAL] 'CURRENT DRAWING STATE:' section missing from prompt!")
+                logger.error("[MEMORY VERIFICATION] [FAIL] CRITICAL: 'CURRENT DRAWING STATE:' section missing from prompt!")
             
             # Call LLM
             response = self.llm.call_llm(prompt)
             logger.info(f"LLM returned {len(response.strokes)} strokes, {len(response.anchors)} anchors")
+            logger.debug(f"LLM assistant_message: {response.assistant_message[:200] if response.assistant_message else 'EMPTY'}...")
             
             # Check if LLM is showing a plan (planning phase)
             if not response.strokes and "plan" in response.anchors and response.anchors.get("current_stage") == 0:
                 # LLM is showing a plan, waiting for approval
-                logger.info("LLM showing plan, waiting for user approval")
+                plan_text = response.assistant_message or "Here is my plan. Should I proceed?"
+                logger.info(f"LLM showing plan, waiting for user approval: {plan_text[:100]}...")
                 # Store the plan in memory
                 self.memory.update_anchors(response.anchors)
                 # Store the question so we can recognize approval
-                self.memory.last_question = response.assistant_message
-                return response.assistant_message
+                self.memory.last_question = plan_text
+                return plan_text
             
             # Check if LLM is asking a follow-up question (no strokes, not done, no plan)
             if not response.strokes and not response.done:
                 # LLM is asking a clarifying question
-                logger.info("LLM asking clarifying question")
+                question_text = response.assistant_message
+                
+                # Check if the message is the default (LLM didn't provide a real question)
+                if not question_text or question_text.strip() == "Ready for next instruction.":
+                    # Generate a better default question based on the instruction
+                    question_text = "I need more information to proceed. Could you clarify your request?"
+                    logger.warning("LLM returned default message instead of a question - using fallback")
+                else:
+                    logger.info(f"LLM asking clarifying question: {question_text[:100]}...")
+                
                 # Store the question so we can recognize answers to it
-                self.memory.last_question = response.assistant_message
-                return response.assistant_message
+                self.memory.last_question = question_text
+                return question_text
             
             # If no strokes but done=true, task is complete (no drawing needed)
             if not response.strokes and response.done:

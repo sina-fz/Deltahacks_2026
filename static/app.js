@@ -169,8 +169,10 @@ async function processInstruction(instruction) {
         const data = await response.json();
         
         if (response.ok && data.success) {
-            // Display assistant's response
-            displayAssistantOutput(data.message);
+            // Display assistant's response (ALWAYS show the message)
+            const message = data.message || "Processing...";
+            console.log('Assistant message:', message);
+            displayAssistantOutput(message);
             
             // Update drawing - always redraw all strokes from memory
             // The server sends all strokes, so we redraw everything
@@ -185,7 +187,12 @@ async function processInstruction(instruction) {
                 checkSystemStatus();
             }
             
-            updateStatus('Ready - Enter another instruction', 'ready');
+            // Update status based on message content
+            if (message.toLowerCase().includes('clarify') || message.toLowerCase().includes('?')) {
+                updateStatus('Waiting for your answer...', 'processing');
+            } else {
+                updateStatus('Ready - Enter another instruction', 'ready');
+            }
         } else {
             const errorMsg = data.error || 'An error occurred';
             displayAssistantOutput("Sorry, I encountered an error: " + errorMsg);

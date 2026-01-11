@@ -115,8 +115,17 @@ class LLMWrapper:
                 # Parse JSON
                 data = json.loads(json_str)
                 
+                # Log raw response for debugging
+                logger.debug(f"LLM raw JSON response: {json.dumps(data, indent=2)[:500]}...")
+                
                 # Validate and create response object
                 llm_response = LLMResponse.from_dict(data)
+                
+                # Log assistant message for debugging
+                if llm_response.assistant_message:
+                    logger.debug(f"LLM assistant_message: {llm_response.assistant_message}")
+                else:
+                    logger.warning("LLM returned empty assistant_message!")
                 
                 logger.info(f"LLM returned {len(llm_response.strokes)} strokes")
                 return llm_response

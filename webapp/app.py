@@ -112,7 +112,7 @@ def process_instruction():
             for s in drawing_system.memory.strokes_history
         ]
         
-        logger.info(f"Returning {len(strokes)} strokes to frontend")
+        logger.info(f"Returning {len(strokes)} strokes to frontend, message: {response[:100] if response else 'None'}...")
         
         # Emit update via WebSocket immediately (non-blocking)
         socketio.emit('drawing_update', {
